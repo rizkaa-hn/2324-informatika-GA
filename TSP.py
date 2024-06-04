@@ -2,122 +2,122 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 
-# Fungsi untuk menghitung jarak Euclidean antara dua titik
-def euclidean_distance(city1, city2):
-    return np.sqrt((city1[0] - city2[0])**2 + (city1[1] - city2[1])**2)
+# Function to compute Euclidean distance between two points
+def compute_euclidean_distance(point1, point2):
+    return np.sqrt((point1[0] - point2[0])**2 + (point1[1] - point2[1])**2)
 
-# Fungsi untuk menghitung total jarak tur
-def total_distance(tour, distance_matrix):
-    return sum(distance_matrix[tour[i], tour[i+1]] for i in range(len(tour)-1))
+# Function to calculate the total distance of a path
+def calculate_total_distance(path, distance_matrix):
+    return sum(distance_matrix[path[i], path[i+1]] for i in range(len(path)-1))
 
-# Fungsi untuk membuat populasi awal
-def create_initial_population(num_cities, population_size):
-    return [random.sample(range(num_cities), num_cities) for _ in range(population_size)]
+# Function to generate the initial population
+def generate_initial_population(city_count, population_size):
+    return [random.sample(range(city_count), city_count) for _ in range(population_size)]
 
-# Fungsi untuk seleksi orang tua menggunakan metode tournament
-def tournament_selection(population, scores, k=3):
-    tournament = random.sample(list(zip(population, scores)), k)
+# Function for parent selection using tournament method
+def tournament_selection(population, fitness_scores, k=3):
+    tournament = random.sample(list(zip(population, fitness_scores)), k)
     tournament.sort(key=lambda x: x[1])
     return tournament[0][0]
 
-# Fungsi untuk melakukan crossover (reproduksi)
+# Function to perform crossover (reproduction)
 def crossover(parent1, parent2):
-    size = len(parent1)
-    p, q = sorted(random.sample(range(size), 2))
-    temp = parent1[p:q+1]
-    child = [city for city in parent2 if city not in temp]
-    return child[:p] + temp + child[p:]
+    length = len(parent1)
+    p, q = sorted(random.sample(range(length), 2))
+    segment = parent1[p:q+1]
+    offspring = [city for city in parent2 if city not in segment]
+    return offspring[:p] + segment + offspring[p:]
 
-# Fungsi untuk melakukan mutasi
-def mutate(tour, mutation_rate):
-    if random.random() < mutation_rate:
-        i, j = random.sample(range(len(tour)), 2)
-        tour[i], tour[j] = tour[j], tour[i]
-    return tour
+# Function to perform mutation
+def mutate(path, mutation_probability):
+    if random.random() < mutation_probability:
+        i, j = random.sample(range(len(path)), 2)
+        path[i], path[j] = path[j], path[i]
+    return path
 
-# Fungsi utama untuk menjalankan algoritma genetika
-def genetic_algorithm(cities, population_size, num_generations, mutation_rate):
-    num_cities = len(cities)
-    distance_matrix = np.array([[euclidean_distance(c1, c2) for c2 in cities] for c1 in cities])
-    population = create_initial_population(num_cities, population_size)
-    scores = [total_distance(tour, distance_matrix) for tour in population]
+# Main function to run the genetic algorithm
+def genetic_algorithm(cities, population_size, num_generations, mutation_probability):
+    city_count = len(cities)
+    distance_matrix = np.array([[compute_euclidean_distance(c1, c2) for c2 in cities] for c1 in cities])
+    population = generate_initial_population(city_count, population_size)
+    fitness_scores = [calculate_total_distance(path, distance_matrix) for path in population]
     
-    best_score = min(scores)
-    best_tour = population[scores.index(best_score)]
+    best_fitness = min(fitness_scores)
+    best_path = population[fitness_scores.index(best_fitness)]
     
-    fitness_history = [best_score]
+    fitness_history = [best_fitness]
     
     for _ in range(num_generations):
         new_population = []
         for _ in range(population_size):
-            parent1 = tournament_selection(population, scores)
-            parent2 = tournament_selection(population, scores)
+            parent1 = tournament_selection(population, fitness_scores)
+            parent2 = tournament_selection(population, fitness_scores)
             child = crossover(parent1, parent2)
-            child = mutate(child, mutation_rate)
+            child = mutate(child, mutation_probability)
             new_population.append(child)
         
         population = new_population
-        scores = [total_distance(tour, distance_matrix) for tour in population]
+        fitness_scores = [calculate_total_distance(path, distance_matrix) for path in population]
         
-        current_best_score = min(scores)
-        if current_best_score < best_score:
-            best_score = current_best_score
-            best_tour = population[scores.index(best_score)]
+        current_best_fitness = min(fitness_scores)
+        if current_best_fitness < best_fitness:
+            best_fitness = current_best_fitness
+            best_path = population[fitness_scores.index(best_fitness)]
         
-        fitness_history.append(best_score)
+        fitness_history.append(best_fitness)
     
-    return best_tour, fitness_history, best_score
+    return best_path, fitness_history, best_fitness
 
-# Parameter
-num_cities = 20
+# Parameters
+city_count = 20
 population_size = 100
 num_generations = 100
-mutation_rate = 0.05
+mutation_probability = 0.05
 
-# Koordinat kota secara acak
+# Random city coordinates
 np.random.seed(42)
-cities = [tuple(coord) for coord in np.random.rand(num_cities, 2) * 100]
+cities = [tuple(coord) for coord in np.random.rand(city_count, 2) * 100]
 
-# Jalankan algoritma genetika
-best_tour, fitness_history, best_score = genetic_algorithm(cities, population_size, num_generations, mutation_rate)
+# Run the genetic algorithm
+best_path, fitness_history, best_fitness = genetic_algorithm(cities, population_size, num_generations, mutation_probability)
 
-# Konversi jarak dari unit arbitrer ke kilometer
-# Misal kita anggap bahwa setiap unit pada koordinat adalah 1 km
-best_score_km = best_score
+# Convert distance from arbitrary units to kilometers
+# Assume that each unit in the coordinates is 1 km
+best_fitness_km = best_fitness
 
-# Tampilkan koordinat kota yang telah diurutkan
-print("Koordinat kota yang telah diurutkan:")
-for i in best_tour:
-    print(f"Kota {i+1}: {cities[i]}")
+# Display the sorted city coordinates
+print("Sorted city coordinates:")
+for i in best_path:
+    print(f"City {i+1}: {cities[i]}")
 
-# Tampilkan jarak terpendek dalam satuan km
-print(f"Jarak terpendek: {best_score_km:.2f} km")
+# Display the shortest distance in kilometers
+print(f"Shortest distance: {best_fitness_km:.2f} km")
 
-# Fungsi untuk memplot tur
-def plot_tour(tour):
+# Function to plot the path
+def plot_path(path):
     plt.figure(figsize=(10, 6))
-    for i in range(len(tour) - 1):
-        plt.plot([cities[tour[i]][0], cities[tour[i+1]][0]], [cities[tour[i]][1], cities[tour[i+1]][1]], 'bo-')
+    for i in range(len(path) - 1):
+        plt.plot([cities[path[i]][0], cities[path[i+1]][0]], [cities[path[i]][1], cities[path[i+1]][1]], 'bo-')
     plt.scatter([city[0] for city in cities], [city[1] for city in cities], color='red')
-    plt.title('Peta Jalur Terpendek TSP dengan Algoritma Genetika')
-    plt.xlabel('X Koordinat')
-    plt.ylabel('Y Koordinat')
+    plt.title('Shortest Path Map of TSP using Genetic Algorithm')
+    plt.xlabel('X Coordinate')
+    plt.ylabel('Y Coordinate')
     plt.grid(True)
     plt.show()
 
-# Fungsi untuk memplot grafik fitness
+# Function to plot the fitness graph
 def plot_fitness(fitness_history):
     plt.figure(figsize=(10, 6))
-    plt.plot(fitness_history, 'g-', label='Fitness Terbaik per Generasi')
-    plt.title('Grafik Fitness Algoritma Genetika untuk TSP')
-    plt.xlabel('Generasi')
-    plt.ylabel('Fitness (Jarak Total Terkecil)')
+    plt.plot(fitness_history, 'g-', label='Best Fitness per Generation')
+    plt.title('Genetic Algorithm Fitness Graph for TSP')
+    plt.xlabel('Generation')
+    plt.ylabel('Fitness (Smallest Total Distance)')
     plt.legend()
     plt.grid(True)
     plt.show()
 
-# Memplot jalur terpendek
-plot_tour(best_tour)
+# Plot the shortest path
+plot_path(best_path)
 
-# Memplot grafik fitness
+# Plot the fitness graph
 plot_fitness(fitness_history)
