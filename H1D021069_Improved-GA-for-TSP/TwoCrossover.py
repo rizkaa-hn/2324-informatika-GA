@@ -83,8 +83,105 @@ def fill_offspring(offspring, parent):
                 current_pos += 1
             offspring[current_pos] = parent[i]
 
-# Implementasi Algoritma GA yang Dimodifikasi
+# Implementasi Algoritma HRX untuk GA yang Dimodifikasi
+def hrx_module(population, distance_matrix, prx, pr, r):
+    size = len(population)
+    num_prx = int(prx * size / 100)
+    num_pr = size - num_prx
+
+    # Membagi populasi menjadi dua bagian
+    population1 = population[:num_prx]
+    population2 = population[num_prx:]
+
+    new_population = []
+
+    # Bagian pertama untuk RX crossover
+    for _ in range(num_prx // 2):
+        parent1, parent2 = random.choices(population1, k=2)
+        offspring1, offspring2 = rx_crossover(parent1, parent2, pr)
+        new_population.extend([offspring1, offspring2])
+
+    # Bagian kedua untuk MSCX Radius crossover
+    for _ in range(num_pr // 2):
+        parent1, parent2 = random.choices(population2, k=2)
+        offspring1 = mscx_radius(parent1, parent2, distance_matrix, r)
+        offspring2 = mscx_radius(parent2, parent1, distance_matrix, r)
+        new_population.extend([offspring1, offspring2])
+
+    return new_population
+
+# Implementasi Algoritma GA yang Dimodifikasi dengan HRX
 def genetic_algorithm(problem, population_size, generations, crossover_rate, mutation_rate, r, prx, pr):
+    nodes = list(problem.get_nodes())
+    nodes = [node - 1 for node in nodes]  # Mengubah indeks agar dimulai dari 0
+    distance_matrix = create_distance_matrix(problem)
+    population = [random.sample(nodes, len(nodes)) for _ in range(population_size)]
+    
+    no_change_gen = 0
+    best_cost = float('inf')
+    
+    for generation in range(generations):
+        population.sort(key=lambda x: calculate_cost(x, distance_matrix))
+        current_best_cost = calculate_cost(population[0], distance_matrix)
+
+        if current_best_cost < best_cost:
+            best_cost = current_best_cost
+            no_change_gen = 0
+        else:
+            no_change_gen += 1
+        
+        print(f"Generation {generation}: Best Cost = {best_cost}")
+
+        if no_change_gen >= 10:  # Jika tidak ada perubahan dalam 10 generasi
+            population = hrx_module(population, distance_matrix, prx, pr, r)
+            no_change_gen = 0
+        
+        new_population = population[:population_size // 2]
+        
+        while len(new_population) < population_size:
+            if random.random() < crossover_rate:
+                parent1, parent2 = random.choices(population[:population_size // 2], k=2)
+                offspring1, offspring2 = rx_crossover(parent1, parent2, pr)
+                new_population.extend([offspring1, offspring2])
+            else:
+                new_population.append(random.choice(population[:population_size // 2]))
+        
+        population = [mutate(ind, mutation_rate) for ind in new_population]
+    
+    best_solution = min(population, key=lambda x: calculate_cost(x, distance_matrix))
+    return best_solution, calculate_cost(best_solution, distance_matrix)
+
+# Implementasi MSCX Crossover untuk GA Standar
+def mscx_crossover(parent1, parent2, distance_matrix):
+    size = len(parent1)
+    offspring = [-1] * size
+    current_node = parent1[0]
+    offspring[0] = current_node
+    visited = {current_node}
+    
+    for i in range(1, size):
+        legitimate_nodes = [node for node in parent1[i:] + parent2[i:] if node not in visited]
+        
+        if not legitimate_nodes:
+            break
+        
+        next_node = min(legitimate_nodes, key=lambda x: distance_matrix[current_node, x])
+        offspring[i] = next_node
+        visited.add(next_node)
+        current_node = next_node
+    
+    for i in range(size):
+        if offspring[i] == -1:
+            for node in parent1 + parent2:
+                if node not in visited:
+                    offspring[i] = node
+                    visited.add(node)
+                    break
+    
+    return offspring
+
+# Implementasi GA1: Algoritma Genetika dengan MSCX-Radius
+def genetic_algorithm_mscx_radius(problem, population_size, generations, crossover_rate, mutation_rate, r):
     nodes = list(problem.get_nodes())
     nodes = [node - 1 for node in nodes]  # Mengubah indeks agar dimulai dari 0
     distance_matrix = create_distance_matrix(problem)
@@ -101,11 +198,8 @@ def genetic_algorithm(problem, population_size, generations, crossover_rate, mut
         while len(new_population) < population_size:
             if random.random() < crossover_rate:
                 parent1, parent2 = random.choices(population[:population_size // 2], k=2)
-                if random.random() < prx:
-                    offspring1, offspring2 = rx_crossover(parent1, parent2, pr)
-                else:
-                    offspring1 = mscx_radius(parent1, parent2, distance_matrix, r)
-                    offspring2 = mscx_radius(parent2, parent1, distance_matrix, r)
+                offspring1 = mscx_radius(parent1, parent2, distance_matrix, r)
+                offspring2 = mscx_radius(parent2, parent1, distance_matrix, r)
                 new_population.extend([offspring1, offspring2])
             else:
                 new_population.append(random.choice(population[:population_size // 2]))
@@ -115,30 +209,33 @@ def genetic_algorithm(problem, population_size, generations, crossover_rate, mut
     best_solution = min(population, key=lambda x: calculate_cost(x, distance_matrix))
     return best_solution, calculate_cost(best_solution, distance_matrix)
 
-# Implementasi Order Crossover untuk GA Standar
-def order_crossover(parent1, parent2):
-    size = len(parent1)
-    offspring1, offspring2 = [-1] * size, [-1] * size
-
-    start, end = sorted(random.sample(range(size), 2))
+# Implementasi GA2: Algoritma Genetika dengan RX Crossover
+def genetic_algorithm_rx(problem, population_size, generations, crossover_rate, mutation_rate, pr):
+    nodes = list(problem.get_nodes())
+    nodes = [node - 1 for node in nodes]  # Mengubah indeks agar dimulai dari 0
+    distance_matrix = create_distance_matrix(problem)
+    population = [random.sample(nodes, len(nodes)) for _ in range(population_size)]
     
-    offspring1[start:end] = parent1[start:end]
-    offspring2[start:end] = parent2[start:end]
+    for generation in range(generations):
+        population.sort(key=lambda x: calculate_cost(x, distance_matrix))
+        best_individual = population[0]
+        best_cost = calculate_cost(best_individual, distance_matrix)
+        print(f"Generation {generation}: Best Cost = {best_cost}")
 
-    fill_order_crossover(offspring1, parent2, start, end)
-    fill_order_crossover(offspring2, parent1, start, end)
-
-    return offspring1, offspring2
-
-def fill_order_crossover(offspring, parent, start, end):
-    size = len(parent)
-    current_pos = end
-    for i in range(size):
-        if parent[(i + end) % size] not in offspring:
-            if current_pos == size:
-                current_pos = 0
-            offspring[current_pos] = parent[(i + end) % size]
-            current_pos += 1
+        new_population = population[:population_size // 2]
+        
+        while len(new_population) < population_size:
+            if random.random() < crossover_rate:
+                parent1, parent2 = random.choices(population[:population_size // 2], k=2)
+                offspring1, offspring2 = rx_crossover(parent1, parent2, pr)
+                new_population.extend([offspring1, offspring2])
+            else:
+                new_population.append(random.choice(population[:population_size // 2]))
+        
+        population = [mutate(ind, mutation_rate) for ind in new_population]
+    
+    best_solution = min(population, key=lambda x: calculate_cost(x, distance_matrix))
+    return best_solution, calculate_cost(best_solution, distance_matrix)
 
 def standard_genetic_algorithm(problem, population_size, generations, crossover_rate, mutation_rate):
     nodes = list(problem.get_nodes())
@@ -157,7 +254,8 @@ def standard_genetic_algorithm(problem, population_size, generations, crossover_
         while len(new_population) < population_size:
             if random.random() < crossover_rate:
                 parent1, parent2 = random.choices(population[:population_size // 2], k=2)
-                offspring1, offspring2 = order_crossover(parent1, parent2)
+                offspring1 = mscx_crossover(parent1, parent2, distance_matrix)
+                offspring2 = mscx_crossover(parent2, parent1, distance_matrix)
                 new_population.extend([offspring1, offspring2])
             else:
                 new_population.append(random.choice(population[:population_size // 2]))
@@ -174,43 +272,77 @@ def load_tsp_file(instance):
 
 # Eksekusi dan Perbandingan
 instances = ['eil51', 'pr76']
-results_standard = []
-results_improved = []
+results_ga1 = []
+results_ga2 = []
+results_ga3 = []
+results_cxga = []
 
 for instance in instances:
     problem = load_tsp_file(instance)
     
-    cost_standard_runs = []
-    cost_improved_runs = []
+    cost_ga1_runs = []
+    cost_ga2_runs = []
+    cost_ga3_runs = []
+    cost_cxga_runs = []
     
-    for _ in range(10):
-        print(f"Running Standard GA for instance {instance}...")
+    for _ in range(3):
+        print(f"Running GA1 (MSCX-Radius) for instance {instance}...")
         start_time = time.time()
-        _, cost_standard = standard_genetic_algorithm(problem, 100, 1000, 0.9, 0.01)
+        _, cost_ga1 = genetic_algorithm_mscx_radius(problem, 100, 500, 0.9, 0.01, 5)
         end_time = time.time()
-        cost_standard_runs.append((cost_standard, end_time - start_time))
+        cost_ga1_runs.append((cost_ga1, end_time - start_time))
         
-        print(f"Running Improved GA for instance {instance}...")
+        print(f"Running GA2 (RX) for instance {instance}...")
         start_time = time.time()
-        _, cost_improved = genetic_algorithm(problem, 100, 1000, 0.9, 0.01, 5, 0.4, 10)
+        _, cost_ga2 = genetic_algorithm_rx(problem, 100, 500, 0.9, 0.01, 10)
         end_time = time.time()
-        cost_improved_runs.append((cost_improved, end_time - start_time))
+        cost_ga2_runs.append((cost_ga2, end_time - start_time))
+        
+        print(f"Running GA3 (MSCX) for instance {instance}...")
+        start_time = time.time()
+        _, cost_ga3 = standard_genetic_algorithm(problem, 100, 500, 0.9, 0.01)
+        end_time = time.time()
+        cost_ga3_runs.append((cost_ga3, end_time - start_time))
+        
+        print(f"Running CXGA (Combined) for instance {instance}...")
+        start_time = time.time()
+        _, cost_cxga = genetic_algorithm(problem, 100, 500, 0.9, 0.01, 5, 0.4, 10)
+        end_time = time.time()
+        cost_cxga_runs.append((cost_cxga, end_time - start_time))
     
-    results_standard.append({
+    results_ga1.append({
         'instance': instance,
-        'min_cost': min(cost for cost, _ in cost_standard_runs),
-        'mean_cost': np.mean([cost for cost, _ in cost_standard_runs]),
-        'std_dev': np.std([cost for cost, _ in cost_standard_runs]),
-        'mean_time': np.mean([time for _, time in cost_standard_runs])
+        'min_cost': min(cost for cost, _ in cost_ga1_runs),
+        'mean_cost': np.mean([cost for cost, _ in cost_ga1_runs]),
+        'std_dev': np.std([cost for cost, _ in cost_ga1_runs]),
+        'mean_time': np.mean([time for _, time in cost_ga1_runs])
     })
     
-    results_improved.append({
+    results_ga2.append({
         'instance': instance,
-        'min_cost': min(cost for cost, _ in cost_improved_runs),
-        'mean_cost': np.mean([cost for cost, _ in cost_improved_runs]),
-        'std_dev': np.std([cost for cost, _ in cost_improved_runs]),
-        'mean_time': np.mean([time for _, time in cost_improved_runs])
+        'min_cost': min(cost for cost, _ in cost_ga2_runs),
+        'mean_cost': np.mean([cost for cost, _ in cost_ga2_runs]),
+        'std_dev': np.std([cost for cost, _ in cost_ga2_runs]),
+        'mean_time': np.mean([time for _, time in cost_ga2_runs])
+    })
+    
+    results_ga3.append({
+        'instance': instance,
+        'min_cost': min(cost for cost, _ in cost_ga3_runs),
+        'mean_cost': np.mean([cost for cost, _ in cost_ga3_runs]),
+        'std_dev': np.std([cost for cost, _ in cost_ga3_runs]),
+        'mean_time': np.mean([time for _, time in cost_ga3_runs])
+    })
+    
+    results_cxga.append({
+        'instance': instance,
+        'min_cost': min(cost for cost, _ in cost_cxga_runs),
+        'mean_cost': np.mean([cost for cost, _ in cost_cxga_runs]),
+        'std_dev': np.std([cost for cost, _ in cost_cxga_runs]),
+        'mean_time': np.mean([time for _, time in cost_cxga_runs])
     })
 
-print("Results for Standard GA:", results_standard)
-print("Results for Improved GA:", results_improved)
+print("Results for GA1 (MSCX-Radius):", results_ga1)
+print("Results for GA2 (RX):", results_ga2)
+print("Results for GA3 (MSCX):", results_ga3)
+print("Results for CXGA (Combined):", results_cxga)
